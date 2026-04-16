@@ -1,6 +1,7 @@
 package telebot
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ func TestBtn(t *testing.T) {
 	assert.Equal(t, &ReplyButton{Text: "T"}, r.Text("T").Reply())
 	assert.Equal(t, &ReplyButton{Text: "T", Contact: true}, r.Contact("T").Reply())
 	assert.Equal(t, &ReplyButton{Text: "T", Location: true}, r.Location("T").Reply())
-	assert.Equal(t, &ReplyButton{Text: "T", Poll: PollAny}, r.Poll("T", PollAny).Reply())
+	assert.Equal(t, &ReplyButton{Text: "T", Poll: &ReplyPollRequest{Type: PollAny}}, r.Poll("T", &ReplyPollRequest{Type: PollAny}).Reply())
 
 	assert.Nil(t, r.Data("T", "u").Reply())
 	assert.Equal(t, &InlineButton{Unique: "u", Text: "T"}, r.Data("T", "u").Inline())
@@ -58,8 +59,8 @@ func TestOptions(t *testing.T) {
 
 	o := &SendOptions{ReplyMarkup: r}
 	assert.Equal(t, o.copy(), o)
-
-	data, err := PollQuiz.MarshalJSON()
+	
+	data, err := json.Marshal(&ReplyPollRequest{Type: PollQuiz})
 	require.NoError(t, err)
-	assert.Equal(t, []byte(`{"type":"quiz"}`), data)
+	assert.JSONEq(t, `{"type":"quiz"}`, string(data))
 }

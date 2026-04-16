@@ -80,22 +80,26 @@ func (r *ReplyMarkup) copy() *ReplyMarkup {
 	return &cp
 }
 
+type ReplyPollRequest struct {
+	Type PollType `json:"type,omitempty"`
+}
+
 // Btn is a constructor button, which will later become either a reply, or an inline button.
 type Btn struct {
-	Unique          string          `json:"unique,omitempty"`
-	Text            string          `json:"text,omitempty"`
-	URL             string          `json:"url,omitempty"`
-	Data            string          `json:"callback_data,omitempty"`
-	InlineQuery     string          `json:"switch_inline_query,omitempty"`
-	InlineQueryChat string          `json:"switch_inline_query_current_chat,omitempty"`
-	Login           *Login          `json:"login_url,omitempty"`
-	WebApp          *WebApp         `json:"web_app,omitempty"`
-	Contact         bool            `json:"request_contact,omitempty"`
-	Location        bool            `json:"request_location,omitempty"`
-	Poll            PollType        `json:"request_poll,omitempty"`
-	User            *ReplyRecipient `json:"request_user,omitempty"`
-	Chat            *ReplyRecipient `json:"request_chat,omitempty"`
-	CopyText        *CopyTextButton `json:"copy_text,omitempty"`
+	Unique          string            `json:"unique,omitempty"`
+	Text            string            `json:"text,omitempty"`
+	URL             string            `json:"url,omitempty"`
+	Data            string            `json:"callback_data,omitempty"`
+	InlineQuery     string            `json:"switch_inline_query,omitempty"`
+	InlineQueryChat string            `json:"switch_inline_query_current_chat,omitempty"`
+	Login           *Login            `json:"login_url,omitempty"`
+	WebApp          *WebApp           `json:"web_app,omitempty"`
+	Contact         bool              `json:"request_contact,omitempty"`
+	Location        bool              `json:"request_location,omitempty"`
+	Poll            *ReplyPollRequest `json:"request_poll,omitempty"`
+	User            *ReplyRecipient   `json:"request_user,omitempty"`
+	Chat            *ReplyRecipient   `json:"request_chat,omitempty"`
+	CopyText        *CopyTextButton   `json:"copy_text,omitempty"`
 }
 
 // Row represents an array of buttons, a row.
@@ -191,7 +195,7 @@ func (r *ReplyMarkup) Location(text string) Btn {
 	return Btn{Location: true, Text: text}
 }
 
-func (r *ReplyMarkup) Poll(text string, poll PollType) Btn {
+func (r *ReplyMarkup) Poll(text string, poll *ReplyPollRequest) Btn {
 	return Btn{Poll: poll, Text: text}
 }
 
@@ -222,22 +226,12 @@ func (r *ReplyMarkup) CopyText(text, copyText string) Btn {
 type ReplyButton struct {
 	Text string `json:"text"`
 
-	Contact  bool            `json:"request_contact,omitempty"`
-	Location bool            `json:"request_location,omitempty"`
-	Poll     PollType        `json:"request_poll,omitempty"`
-	User     *ReplyRecipient `json:"request_users,omitempty"`
-	Chat     *ReplyRecipient `json:"request_chat,omitempty"`
-	WebApp   *WebApp         `json:"web_app,omitempty"`
-}
-
-// MarshalJSON implements json.Marshaler. It allows passing PollType as a
-// keyboard's poll type instead of KeyboardButtonPollType object.
-func (pt PollType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Type string `json:"type"`
-	}{
-		Type: string(pt),
-	})
+	Contact  bool              `json:"request_contact,omitempty"`
+	Location bool              `json:"request_location,omitempty"`
+	Poll     *ReplyPollRequest `json:"request_poll,omitempty"`
+	User     *ReplyRecipient   `json:"request_users,omitempty"`
+	Chat     *ReplyRecipient   `json:"request_chat,omitempty"`
+	WebApp   *WebApp           `json:"web_app,omitempty"`
 }
 
 // ReplyRecipient combines both KeyboardButtonRequestUser
