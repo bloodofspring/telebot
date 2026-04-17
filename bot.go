@@ -516,7 +516,7 @@ func (b *Bot) Copy(to Recipient, msg Editable, opts ...interface{}) (*Message, e
 // If some of the specified messages can't be found or copied, they are skipped.
 // Service messages, giveaway messages, giveaway winners messages, and
 // invoice messages can't be copied. A quiz poll can be copied only if the value of the field
-// correct_option_id is known to the bot. The method is analogous
+// correct_option_ids is known to the bot. The method is analogous
 // to the method forwardMessages, but the copied messages don't have a link to the original message.
 // Album grouping is kept for copied messages.
 func (b *Bot) CopyMany(to Recipient, msgs []Editable, opts ...*SendOptions) ([]Message, error) {

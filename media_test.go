@@ -74,3 +74,31 @@ func TestPaidMediaPayload(t *testing.T) {
 	assert.Equal(t, "photo", pm.Type)
 	assert.Equal(t, "custom_payload", pm.Payload)
 }
+
+func TestAddCaptionAboveParam(t *testing.T) {
+	tests := []struct {
+		name         string
+		caption      string
+		captionAbove bool
+		expected     bool
+	}{
+		{name: "enabled with caption", caption: "hello", captionAbove: true, expected: true},
+		{name: "disabled without caption", caption: "", captionAbove: true, expected: false},
+		{name: "disabled by flag", caption: "hello", captionAbove: false, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := map[string]string{}
+			addCaptionAboveParam(params, tt.caption, tt.captionAbove)
+
+			got, ok := params["show_caption_above_media"]
+			if tt.expected {
+				assert.True(t, ok)
+				assert.Equal(t, "true", got)
+				return
+			}
+			assert.False(t, ok)
+		})
+	}
+}

@@ -28,6 +28,7 @@ func (p *Photo) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
 		"chat_id": to.Recipient(),
 		"caption": p.Caption,
 	}
+	addCaptionAboveParam(params, p.Caption, p.CaptionAbove)
 	b.embedSendOptions(params, opt)
 
 	msg, err := b.sendMedia(p, params, nil)
@@ -38,6 +39,8 @@ func (p *Photo) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
 	msg.Photo.File.stealRef(&p.File)
 	*p = *msg.Photo
 	p.Caption = msg.Caption
+	p.CaptionAbove = msg.CaptionAbove
+	p.HasSpoiler = msg.HasMediaSpoiler
 
 	return msg, nil
 }
@@ -137,6 +140,7 @@ func (v *Video) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
 		"caption":   v.Caption,
 		"file_name": v.FileName,
 	}
+	addCaptionAboveParam(params, v.Caption, v.CaptionAbove)
 	b.embedSendOptions(params, opt)
 
 	if v.Duration != 0 {
@@ -170,6 +174,8 @@ func (v *Video) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
 		vid.File.stealRef(&v.File)
 		*v = *vid
 		v.Caption = msg.Caption
+		v.CaptionAbove = msg.CaptionAbove
+		v.HasSpoiler = msg.HasMediaSpoiler
 	} else if doc := msg.Document; doc != nil {
 		// If video has no sound, Telegram can turn it into Document (GIF)
 		doc.File.stealRef(&v.File)
@@ -177,6 +183,8 @@ func (v *Video) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
 		v.Caption = doc.Caption
 		v.MIME = doc.MIME
 		v.Thumbnail = doc.Thumbnail
+		v.CaptionAbove = msg.CaptionAbove
+		v.HasSpoiler = msg.HasMediaSpoiler
 	}
 
 	return msg, nil
@@ -189,6 +197,7 @@ func (a *Animation) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, erro
 		"caption":   a.Caption,
 		"file_name": a.FileName,
 	}
+	addCaptionAboveParam(params, a.Caption, a.CaptionAbove)
 	b.embedSendOptions(params, opt)
 
 	if a.Duration != 0 {
@@ -216,15 +225,25 @@ func (a *Animation) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, erro
 		*a = *msg.Animation
 	} else if doc := msg.Document; doc != nil {
 		*a = Animation{
-			File:      doc.File,
-			Thumbnail: doc.Thumbnail,
-			MIME:      doc.MIME,
-			FileName:  doc.FileName,
+			File:         doc.File,
+			Thumbnail:    doc.Thumbnail,
+			MIME:         doc.MIME,
+			FileName:     doc.FileName,
+			HasSpoiler:   msg.HasMediaSpoiler,
+			CaptionAbove: msg.CaptionAbove,
 		}
 	}
 
 	a.Caption = msg.Caption
+	a.CaptionAbove = msg.CaptionAbove
+	a.HasSpoiler = msg.HasMediaSpoiler
 	return msg, nil
+}
+
+func addCaptionAboveParam(params map[string]string, caption string, captionAbove bool) {
+	if caption != "" && captionAbove {
+		params["show_caption_above_media"] = "true"
+	}
 }
 
 // Send delivers media through bot b to recipient.
@@ -341,28 +360,11 @@ func (i *Invoice) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error)
 
 // Send delivers poll through bot b to recipient.
 func (p *Poll) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
-	params := map[string]string{
-		"chat_id":                 to.Recipient(),
-		"question":                p.Question,
-		"type":                    string(p.Type),
-		"is_closed":               strconv.FormatBool(p.Closed),
-		"is_anonymous":            strconv.FormatBool(p.Anonymous),
-		"allows_multiple_answers": strconv.FormatBool(p.MultipleAnswers),
-		"correct_option_id":       strconv.Itoa(p.CorrectOption),
-	}
-	if p.Explanation != "" {
-		params["explanation"] = p.Explanation
-		params["explanation_parse_mode"] = p.ParseMode
-	}
-	if p.OpenPeriod != 0 {
-		params["open_period"] = strconv.Itoa(p.OpenPeriod)
-	} else if p.CloseUnixdate != 0 {
-		params["close_date"] = strconv.FormatInt(p.CloseUnixdate, 10)
+	params, err := p.sendParams(to)
+	if err != nil {
+		return nil, err
 	}
 	b.embedSendOptions(params, opt)
-
-	opts, _ := json.Marshal(p.Options)
-	params["options"] = string(opts)
 
 	data, err := b.Raw("sendPoll", params)
 	if err != nil {
@@ -370,6 +372,113 @@ func (p *Poll) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error) {
 	}
 
 	return extractMessage(data)
+}
+
+func (p *Poll) sendParams(to Recipient) (map[string]string, error) {
+	params := map[string]string{
+		"chat_id":                 to.Recipient(),
+		"question":                p.Question,
+		"is_closed":               strconv.FormatBool(p.Closed),
+		"is_anonymous":            strconv.FormatBool(p.Anonymous),
+		"allows_multiple_answers": strconv.FormatBool(p.MultipleAnswers),
+	}
+	if p.Type != "" {
+		params["type"] = string(p.Type)
+	}
+	if p.AllowsRevoting {
+		params["allows_revoting"] = strconv.FormatBool(true)
+	}
+	if p.ShuffleOptions {
+		params["shuffle_options"] = strconv.FormatBool(true)
+	}
+	if p.AllowAddingOptions {
+		params["allow_adding_options"] = strconv.FormatBool(true)
+	}
+	if p.HideResultsUntilCloses {
+		params["hide_results_until_closes"] = strconv.FormatBool(true)
+	}
+	if err := addPollTextParams(params, "question", "", p.QuestionParseMode, p.QuestionEntities); err != nil {
+		return nil, err
+	}
+	if err := addPollTextParams(params, "explanation", p.Explanation, p.ParseMode, p.Entities); err != nil {
+		return nil, err
+	}
+	if err := addPollTextParams(params, "description", p.Description, p.DescriptionParseMode, p.DescriptionEntities); err != nil {
+		return nil, err
+	}
+	if correctOptionIDs := p.correctOptionIDsForSend(); len(correctOptionIDs) > 0 {
+		data, err := json.Marshal(correctOptionIDs)
+		if err != nil {
+			return nil, err
+		}
+		params["correct_option_ids"] = string(data)
+	}
+	if p.OpenPeriod != 0 {
+		params["open_period"] = strconv.Itoa(p.OpenPeriod)
+	} else if p.CloseUnixdate != 0 {
+		params["close_date"] = strconv.FormatInt(p.CloseUnixdate, 10)
+	}
+
+	options, err := p.inputOptionsJSON()
+	if err != nil {
+		return nil, err
+	}
+	params["options"] = options
+
+	return params, nil
+}
+
+// correctOptionIDsForSend preserves the legacy single-answer field while
+// preferring the current Bot API representation when it is available.
+func (p *Poll) correctOptionIDsForSend() []int {
+	if len(p.CorrectOptionIDs) > 0 {
+		return append([]int(nil), p.CorrectOptionIDs...)
+	}
+	if p.Type == PollQuiz {
+		return []int{p.CorrectOption}
+	}
+	if p.CorrectOption != 0 {
+		return []int{p.CorrectOption}
+	}
+	return nil
+}
+
+func (p *Poll) inputOptionsJSON() (string, error) {
+	options := make([]InputPollOption, 0, len(p.Options))
+	for _, option := range p.Options {
+		options = append(options, InputPollOption{
+			Text:      option.Text,
+			ParseMode: option.ParseMode,
+			Entities:  append([]MessageEntity(nil), option.Entities...),
+		})
+	}
+
+	data, err := json.Marshal(options)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func addPollTextParams(params map[string]string, field, text string, parseMode ParseMode, entities []MessageEntity) error {
+	if field != "question" && text == "" {
+		return nil
+	}
+	if text != "" {
+		params[field] = text
+	}
+	if len(entities) > 0 {
+		data, err := json.Marshal(entities)
+		if err != nil {
+			return err
+		}
+		params[field+"_entities"] = string(data)
+		return nil
+	}
+	if parseMode != ModeDefault {
+		params[field+"_parse_mode"] = string(parseMode)
+	}
+	return nil
 }
 
 // Send delivers dice through bot b to recipient.
