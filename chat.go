@@ -15,7 +15,7 @@ type User struct {
 	Username            string   `json:"username"`
 	LanguageCode        string   `json:"language_code"`
 	IsBot               bool     `json:"is_bot"`
-	IsPremium           bool     `json:"is_premium"`
+	IsPremium           bool     `json:"is_premium" default:"false"`
 	AddedToMenu         bool     `json:"added_to_attachment_menu"`
 	Usernames           []string `json:"active_usernames"`
 	StatusCustomEmojiID string   `json:"emoji_status_custom_emoji_id"`
