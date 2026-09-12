@@ -11,5 +11,5 @@ func TestExtractOptionsStringPanics(t *testing.T) {
 		}
 	}()
 	b := &Bot{}
-	b.extractOptions([]interface{}{&SendOptions{}, "caption string"})
+	b.extractOptions([]interface{}{&SendOptions{}, 42})
 }

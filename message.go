@@ -1,6 +1,7 @@
 package telebot
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 	"unicode/utf16"
@@ -8,6 +9,7 @@ import (
 
 // Message object represents a message.
 type Message struct {
+	Raw json.RawMessage `json:"-"`
 	ID int `json:"message_id"`
 
 	// (Optional) Unique identifier of a message thread to which the message belongs; for supergroups only
@@ -355,6 +357,62 @@ type Message struct {
 
 	// Service message: the user allowed the bot added to the attachment menu to write messages
 	WriteAccessAllowed *WriteAccessAllowed `json:"write_access_allowed,omitempty"`
+}
+
+
+
+func (m *Message) AddInlineButton(button InlineButton) *Message {
+	if len(m.ReplyMarkup.InlineKeyboard) == 0 {
+		m.ReplyMarkup.InlineKeyboard = append(m.ReplyMarkup.InlineKeyboard, []InlineButton{button})
+		return m
+	}
+
+	l := len(m.ReplyMarkup.InlineKeyboard)
+	m.ReplyMarkup.InlineKeyboard[l-1] = append(m.ReplyMarkup.InlineKeyboard[l-1], button)
+
+	return m
+}
+
+func (m *Message) AddKeyboardButton(button ReplyButton) *Message {
+	if len(m.ReplyMarkup.ReplyKeyboard) == 0 {
+		m.ReplyMarkup.ReplyKeyboard = append(m.ReplyMarkup.ReplyKeyboard, []ReplyButton{button})
+		return m
+	}
+
+	l := len(m.ReplyMarkup.InlineKeyboard)
+	m.ReplyMarkup.ReplyKeyboard[l-1] = append(m.ReplyMarkup.ReplyKeyboard[l-1], button)
+
+	return m
+}
+
+func (m *Message) NextRow() *Message {
+	if len(m.ReplyMarkup.ReplyKeyboard) != 0 {
+		m.ReplyMarkup.ReplyKeyboard = append(m.ReplyMarkup.ReplyKeyboard, []ReplyButton{})
+
+		return m
+	}
+
+	if len(m.ReplyMarkup.InlineKeyboard) != 0 {
+		m.ReplyMarkup.InlineKeyboard = append(m.ReplyMarkup.InlineKeyboard, []InlineButton{})
+
+		return m
+	}
+
+	return m
+}
+
+func (m *Message) UnmarshalJSON(data []byte) error {
+	m.Raw = append([]byte(nil), data...)
+	type alias Message
+	return json.Unmarshal(data, (*alias)(m))
+}
+
+func (m *Message) MarshalJSON() ([]byte, error) {
+	if len(m.Raw) > 0 {
+		return m.Raw, nil
+	}
+	type alias Message
+	return json.Marshal((*alias)(m))
 }
 
 // MessageEntity object represents "special" parts of text messages,
